@@ -184,7 +184,10 @@
 <div class="layout">
 
   <div class="panel">
-    <div class="sync-status" id="syncStatus"><span class="dot off"></span> Usando dados de exemplo (planilha não conectada)</div>
+    <div class="toolbar" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+      <div class="sync-status" id="syncStatus" style="margin-bottom:0;"><span class="dot off"></span> Usando dados de exemplo (planilha não conectada)</div>
+      <button class="toolbar-btn" id="recarregarBtn" style="background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-size:12.5px; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 Forçar sincronização</button>
+    </div>
 
     <div class="panel-title">1. Aparelho que o cliente quer levar</div>
     <div class="field">
@@ -201,6 +204,12 @@
       <label>Condição / estado do aparelho</label>
       <select id="selUsadoCondicao"></select>
     </div>
+
+    <div class="panel-title" style="margin-top:20px;">3. Entrada em dinheiro ou Pix (opcional)</div>
+    <div class="field">
+      <label>Quanto o cliente vai adiantar à vista, além do aparelho</label>
+      <input type="number" id="entradaDinheiro" value="0" min="0" step="1">
+    </div>
   </div>
 
   <div class="receipt">
@@ -213,18 +222,25 @@
         <span>Valor de entrada (aparelho usado)</span>
         <span class="val" id="valEntrada">– R$ 0,00</span>
       </div>
+      <div class="linha-calc">
+        <span>Entrada em dinheiro/Pix</span>
+        <span class="val" id="valEntradaDinheiro">– R$ 0,00</span>
+      </div>
       <div class="linha-calc total">
-        <span id="labelVolta">Valor da volta</span>
+        <span id="labelVolta">Saldo devedor (vai pro cartão)</span>
         <span class="val" id="valVolta">R$ 0,00</span>
       </div>
 
       <div class="parcela-config">
         <input type="checkbox" id="incluirParcela" checked style="width:18px; height:18px; accent-color:var(--orange);">
-        Parcelar a diferença em
-        <input type="number" id="numParcelas" value="10" min="1" max="18">
-        vezes
+        Mostrar 2 opções de parcela:
+        <input type="number" id="numParcelas1" value="6" min="1" max="18">
+        x  e
+        <input type="number" id="numParcelas2" value="10" min="1" max="18">
+        x
       </div>
-      <div class="parcela-resultado" id="parcelaResultado">10x de R$ 0,00 no cartão</div>
+      <div class="parcela-resultado" id="parcelaResultado1">6x de R$ 0,00 no cartão</div>
+      <div class="parcela-resultado" id="parcelaResultado2">10x de R$ 0,00 no cartão</div>
     </div>
   </div>
 
@@ -232,7 +248,7 @@
     <div class="panel-title">Texto pronto pra colar no WhatsApp</div>
     <textarea id="textoSaida" readonly></textarea>
     <button class="copy-btn" id="copyBtn">Copiar texto</button>
-    <div class="warn">Se o aparelho de entrada valer mais que o desejado, revise manualmente — a proposta não fecha sozinha nesse cenário.</div>
+    <div class="warn">Se o aparelho de entrada + dinheiro valer mais que o desejado, revise manualmente — a proposta não fecha sozinha nesse cenário.</div>
   </div>
 
 </div>
@@ -290,59 +306,69 @@
     const modeloUsado = selUsadoModelo.value;
     const condicaoUsado = selUsadoCondicao.value;
     const valorEntrada = (compraMatriz[modeloUsado] && compraMatriz[modeloUsado][condicaoUsado]) || 0;
+    const entradaDinheiro = parseFloat(document.getElementById('entradaDinheiro').value) || 0;
 
     const precoDesejado = desejadoObj.preco;
-    const valorVolta = precoDesejado - valorEntrada;
+    const valorAparelhoRestante = precoDesejado - valorEntrada;
+    const saldoDevedor = valorAparelhoRestante - entradaDinheiro;
 
     document.getElementById('valDesejado').textContent = fmt(precoDesejado);
     document.getElementById('valEntrada').textContent = '– ' + fmt(valorEntrada);
+    document.getElementById('valEntradaDinheiro').textContent = '– ' + fmt(entradaDinheiro);
 
     const labelVolta = document.getElementById('labelVolta');
     const valVoltaEl = document.getElementById('valVolta');
-    if (valorVolta >= 0) {
-      labelVolta.textContent = 'Valor da volta';
-      valVoltaEl.textContent = fmt(valorVolta);
+    if (saldoDevedor >= 0) {
+      labelVolta.textContent = 'Saldo devedor (vai pro cartão)';
+      valVoltaEl.textContent = fmt(saldoDevedor);
       valVoltaEl.style.color = '';
     } else {
-      labelVolta.textContent = '⚠️ Entrada vale mais (revisar)';
-      valVoltaEl.textContent = fmt(Math.abs(valorVolta));
+      labelVolta.textContent = '⚠️ Pagou mais que o necessário (revisar)';
+      valVoltaEl.textContent = fmt(Math.abs(saldoDevedor));
       valVoltaEl.style.color = 'var(--red)';
     }
 
     const incluirParcela = document.getElementById('incluirParcela').checked;
-    const n = parseInt(document.getElementById('numParcelas').value) || 1;
-    const parcelaEl = document.getElementById('parcelaResultado');
-    let parcelaTexto = '';
-    if (incluirParcela && valorVolta > 0) {
-      const parcela = calcParcela(valorVolta, n);
-      if (parcela !== null) {
-        parcelaTexto = `${n}x de ${fmt(parcela)} no cartão`;
-        parcelaEl.textContent = parcelaTexto;
-        parcelaEl.style.display = 'block';
-      } else {
-        parcelaEl.style.display = 'none';
-      }
+    const n1 = parseInt(document.getElementById('numParcelas1').value) || 1;
+    const n2 = parseInt(document.getElementById('numParcelas2').value) || 1;
+    const parcelaEl1 = document.getElementById('parcelaResultado1');
+    const parcelaEl2 = document.getElementById('parcelaResultado2');
+    let parcelaTexto1 = '', parcelaTexto2 = '';
+
+    if (incluirParcela && saldoDevedor > 0) {
+      const p1 = calcParcela(saldoDevedor, n1);
+      const p2 = calcParcela(saldoDevedor, n2);
+      if (p1 !== null) { parcelaTexto1 = `${n1}x de ${fmt(p1)} no cartão`; parcelaEl1.textContent = parcelaTexto1; parcelaEl1.style.display = 'block'; }
+      else parcelaEl1.style.display = 'none';
+      if (p2 !== null) { parcelaTexto2 = `${n2}x de ${fmt(p2)} no cartão`; parcelaEl2.textContent = parcelaTexto2; parcelaEl2.style.display = 'block'; }
+      else parcelaEl2.style.display = 'none';
     } else {
-      parcelaEl.style.display = 'none';
+      parcelaEl1.style.display = 'none';
+      parcelaEl2.style.display = 'none';
     }
 
     // Texto pra WhatsApp
     let texto = '';
-    if (valorVolta >= 0) {
-      texto = `Pra levar o ${desejadoObj.modelo} dando seu ${modeloUsado} (${condicaoUsado}) de entrada, a volta é de ${fmt(valorVolta)}.`;
-      if (incluirParcela && parcelaTexto) {
-        texto += `\nDá pra parcelar em até ${parcelaTexto}.`;
+    if (saldoDevedor >= 0) {
+      texto = `Pra levar o ${desejadoObj.modelo} dando seu ${modeloUsado} (${condicaoUsado}) de entrada`;
+      if (entradaDinheiro > 0) texto += ` + ${fmt(entradaDinheiro)} em dinheiro/Pix`;
+      texto += `, o saldo restante é de ${fmt(saldoDevedor)}.`;
+      if (incluirParcela && (parcelaTexto1 || parcelaTexto2)) {
+        const opcoes = [parcelaTexto1, parcelaTexto2].filter(Boolean).join(' ou ');
+        texto += `\nDá pra parcelar em ${opcoes}.`;
       }
       texto += `\nQuer fechar agora? 🤝`;
     } else {
-      texto = `[Revisar manualmente — o aparelho de entrada avaliado vale mais que o desejado nessa simulação]`;
+      texto = `[Revisar manualmente — o valor pago (aparelho + dinheiro) é maior que o necessário nessa simulação]`;
     }
     textoSaida.value = texto;
   }
 
   [selDesejado, selUsadoModelo, selUsadoCondicao].forEach(el => el.addEventListener('change', recalcular));
+  document.getElementById('entradaDinheiro').addEventListener('input', recalcular);
   document.getElementById('incluirParcela').addEventListener('change', recalcular);
-  document.getElementById('numParcelas').addEventListener('input', recalcular);
+  document.getElementById('numParcelas1').addEventListener('input', recalcular);
+  document.getElementById('numParcelas2').addEventListener('input', recalcular);
 
   document.getElementById('copyBtn').addEventListener('click', () => {
     navigator.clipboard.writeText(textoSaida.value).then(() => {
@@ -362,15 +388,22 @@
   }
 
   function parseVendaCSV(text) {
-    const linhas = text.trim().split('\n').map(l => l.split(','));
-    const headers = linhas[0].map(h => h.toLowerCase().trim());
-    return linhas.slice(1).map(cols => {
-      const obj = {};
-      headers.forEach((h, idx) => obj[h] = (cols[idx] || '').trim().replace(/^"|"$/g, ''));
-      if ((obj.disponivel || '').toLowerCase().startsWith('n')) return null;
-      const nome = [obj.modelo, obj.capacidade, obj.cor].filter(Boolean).join(' ');
-      return { modelo: nome, preco: parseNumeroBR(obj.preco) };
-    }).filter(Boolean);
+    const linhas = text.replace(/\r/g, '').trim().split('\n').map(l => l.split(','));
+    // colunas fixas por posição: 0 Categoria, 1 Marca, 2 Modelo, 3 Armazenamento, 4 Cor, 5 Condição, 6 Bateria%, 7 Qtd, 8 Preço, 9 Preço à Vista
+    const itens = [];
+    for (let i = 1; i < linhas.length; i++) {
+      const row = linhas[i];
+      const modeloBase = (row[2] || '').trim();
+      if (!modeloBase) continue;
+      const armazenamento = (row[3] || '').trim();
+      const cor = (row[4] || '').trim();
+      const qtd = parseInt(row[7]) || 0;
+      const precoVista = parseNumeroBR(row[9]) || parseNumeroBR(row[8]);
+      if (qtd <= 0) continue;
+      const nome = [modeloBase, armazenamento, cor].filter(Boolean).join(' ');
+      itens.push({ modelo: nome, preco: precoVista });
+    }
+    return itens;
   }
 
   function parseCompraCSV(text) {
@@ -406,11 +439,11 @@
     try {
       if (vendaOk) {
         const res = await fetch(VENDA_CSV_URL + '&t=' + Date.now());
-        venda = parseVendaCSV(await res.text());
+        venda = parseVendaCSV(new TextDecoder('windows-1252').decode(await res.arrayBuffer()));
       }
       if (compraOk) {
         const res2 = await fetch(COMPRA_CSV_URL + '&t=' + Date.now());
-        const parsed = parseCompraCSV(await res2.text());
+        const parsed = parseCompraCSV(new TextDecoder('windows-1252').decode(await res2.arrayBuffer()));
         compraModelos = parsed.modelos;
         compraCondicoes = parsed.condicoes;
         compraMatriz = parsed.matriz;
@@ -422,6 +455,14 @@
     popularSelects();
     recalcular();
   }
+
+  document.getElementById('recarregarBtn').addEventListener('click', () => {
+    const btn = document.getElementById('recarregarBtn');
+    btn.textContent = '🔄 Sincronizando...';
+    carregarPlanilhas().then(() => {
+      btn.textContent = '🔄 Forçar sincronização';
+    });
+  });
 
   carregarPlanilhas();
 </script>
