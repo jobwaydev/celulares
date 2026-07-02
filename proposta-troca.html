@@ -361,11 +361,12 @@
       texto += `Pra levar o *${desejadoObj.modelo}* dando seu *${modeloUsado} (${condicaoUsado})* de entrada`;
       if (entradaDinheiro > 0) texto += ` + *${fmt(entradaDinheiro)}* em dinheiro/Pix`;
       texto += `, o saldo restante é de *${fmt(saldoDevedor)}*.`;
+      texto += `\n\nPra fecharmos hoje, consigo fazer *${fmt(saldoDevedor)}* à vista no Pix ou dinheiro.`;
       if (incluirParcela && (parcelaTexto1 || parcelaTexto2)) {
         const opcoes = [parcelaTexto1, parcelaTexto2].filter(Boolean).join('\n');
-        texto += `\n\nDá pra parcelar em:\n${opcoes}`;
+        texto += `\n\nOu, se preferir parcelar no cartão:\n${opcoes}`;
       }
-      texto += `\n\nQuer fechar agora? 🤝`;
+      texto += `\n\nO que achou? 🤝`;
     } else {
       texto = `[Revisar manualmente — o valor pago (aparelho + dinheiro) é maior que o necessário nessa simulação]`;
     }
