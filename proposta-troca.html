@@ -189,6 +189,11 @@
       <button class="toolbar-btn" id="recarregarBtn" style="background:var(--surface-2); border:1px solid var(--line); color:var(--text); font-size:12.5px; padding:8px 12px; border-radius:6px; cursor:pointer;">🔄 Forçar sincronização</button>
     </div>
 
+    <div class="field">
+      <label>Nome do lead (opcional — deixe em branco pra manter a tag {Nome do lead|leadName} no texto)</label>
+      <input type="text" id="nomeLead" placeholder="Ex: João">
+    </div>
+
     <div class="panel-title">1. Aparelho que o cliente quer levar</div>
     <div class="field">
       <label>Modelo desejado</label>
@@ -338,9 +343,9 @@
     if (incluirParcela && saldoDevedor > 0) {
       const p1 = calcParcela(saldoDevedor, n1);
       const p2 = calcParcela(saldoDevedor, n2);
-      if (p1 !== null) { parcelaTexto1 = `${n1}x de ${fmt(p1)} no cartão`; parcelaEl1.textContent = parcelaTexto1; parcelaEl1.style.display = 'block'; }
+      if (p1 !== null) { parcelaTexto1 = `▪️ *${n1}x de ${fmt(p1)}* no cartão`; parcelaEl1.textContent = `${n1}x de ${fmt(p1)} no cartão`; parcelaEl1.style.display = 'block'; }
       else parcelaEl1.style.display = 'none';
-      if (p2 !== null) { parcelaTexto2 = `${n2}x de ${fmt(p2)} no cartão`; parcelaEl2.textContent = parcelaTexto2; parcelaEl2.style.display = 'block'; }
+      if (p2 !== null) { parcelaTexto2 = `▪️ *${n2}x de ${fmt(p2)}* no cartão`; parcelaEl2.textContent = `${n2}x de ${fmt(p2)} no cartão`; parcelaEl2.style.display = 'block'; }
       else parcelaEl2.style.display = 'none';
     } else {
       parcelaEl1.style.display = 'none';
@@ -348,16 +353,19 @@
     }
 
     // Texto pra WhatsApp
+    const nomeLead = (document.getElementById('nomeLead') ? document.getElementById('nomeLead').value.trim() : '');
+    const saudacao = nomeLead ? nomeLead : '{Nome do lead|leadName}';
     let texto = '';
     if (saldoDevedor >= 0) {
-      texto = `Pra levar o ${desejadoObj.modelo} dando seu ${modeloUsado} (${condicaoUsado}) de entrada`;
-      if (entradaDinheiro > 0) texto += ` + ${fmt(entradaDinheiro)} em dinheiro/Pix`;
-      texto += `, o saldo restante é de ${fmt(saldoDevedor)}.`;
+      texto = `Oi, ${saudacao}! 👋\n\n`;
+      texto += `Pra levar o *${desejadoObj.modelo}* dando seu *${modeloUsado} (${condicaoUsado})* de entrada`;
+      if (entradaDinheiro > 0) texto += ` + *${fmt(entradaDinheiro)}* em dinheiro/Pix`;
+      texto += `, o saldo restante é de *${fmt(saldoDevedor)}*.`;
       if (incluirParcela && (parcelaTexto1 || parcelaTexto2)) {
-        const opcoes = [parcelaTexto1, parcelaTexto2].filter(Boolean).join(' ou ');
-        texto += `\nDá pra parcelar em ${opcoes}.`;
+        const opcoes = [parcelaTexto1, parcelaTexto2].filter(Boolean).join('\n');
+        texto += `\n\nDá pra parcelar em:\n${opcoes}`;
       }
-      texto += `\nQuer fechar agora? 🤝`;
+      texto += `\n\nQuer fechar agora? 🤝`;
     } else {
       texto = `[Revisar manualmente — o valor pago (aparelho + dinheiro) é maior que o necessário nessa simulação]`;
     }
@@ -366,6 +374,7 @@
 
   [selDesejado, selUsadoModelo, selUsadoCondicao].forEach(el => el.addEventListener('change', recalcular));
   document.getElementById('entradaDinheiro').addEventListener('input', recalcular);
+  document.getElementById('nomeLead').addEventListener('input', recalcular);
   document.getElementById('incluirParcela').addEventListener('change', recalcular);
   document.getElementById('numParcelas1').addEventListener('input', recalcular);
   document.getElementById('numParcelas2').addEventListener('input', recalcular);
